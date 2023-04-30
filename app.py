@@ -1,15 +1,14 @@
-import numpy as np
 import random
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
 
-# N - počet hráčů
-# M - počet soupeřů, proti kterým hraje každý hráč
-N = 10
-M = 5
+N = int(input("Zadejte počet hráčů: "))
+M = int(input("Zadejte počet soupeřů, proti kterým hraje každý hráč: "))
+K = int(input("Zadejte počet kol: "))
+X = int(input("Vyrvoření nové generace hráčů: 1 - ANO, 0 - NE: "))
 
 # Definice strategií hráčů
-STRATEGIES = ['tit for tat', 'random', 'rock', 'paper']
+STRATEGIES = ['tit_for_tat', 'random', 'paper', 'rock']
 
 # Funkce pro výpočet výsledku hry kámen-nůžky-papír
 def get_score(player1, player2):
@@ -20,43 +19,51 @@ def get_score(player1, player2):
     else:
         return -1
 
+def init_strategy_choise(strategy):
+    if strategy == 'paper':    
+        choice = 'paper'
+    elif strategy == 'rock':
+        choice = 'rock'
+    else:
+        choice = random.choice(['rock', 'paper', 'scissors'])   
+    return choice    
+
 # Třída hráče
 class Player:
     def __init__(self, strategy, index):
         self.strategy = strategy
         self.score = 0
         self.index = index
+        self.choise = init_strategy_choise(strategy)
+        self.history = [self.choise]
     
     # Metoda pro zahrání kola
     def play(self, opponents):
-        choices = [opponent.strategy for opponent in opponents]
-        opponentPlayers = [opponent.index for opponent in opponents]
-        
-        print(opponentPlayers)
-        
-        if self.strategy == 'tit for tat':
-            if len(choices) == 0:
-                choice = random.choice(['rock', 'paper', 'scissors'])
+        scoress = []
+        for opponent in opponents:
+            if self.strategy == 'tit_for_tat':
+                if 1 < len(opponent.history):
+                    self.choise = opponent.history[-2]
+                else:
+                    self.choise = random.choice(['rock', 'paper', 'scissors'])
+            elif self.strategy == 'random':
+                self.choise = random.choice(['rock', 'paper', 'scissors'])
+            elif self.strategy == 'paper':    
+                self.choise = 'paper'
             else:
-                choice = choices[-1]
-        elif self.strategy == 'random':
-            choice = random.choice(['rock', 'paper', 'scissors'])
-        elif self.strategy == 'paper':    
-            choice = 'paper'
-        else:
-            choice = 'rock'
+                self.choise = 'rock'
+            #print("hraje ", opponent.index)
+            scoress.append(get_score(self.choise, opponent.choise)) 
+            self.history.append(self.choise)   
         
-        scores = [get_score(choice, opponent.strategy) for opponent in opponents]
-        self.score += sum(scores)
+        #scores = [get_score(self.choise, opponent.choise) for opponent in opponents]
+        self.score += sum(scoress)
     
     # Metoda pro křížení dvou hráčů a vytvoření potomka s malou pravděpodobností mutace strategie
     def crossover(self, other):
-        if random.random() < 0.5:
-            new_strategy = self.strategy
-        else:
-            new_strategy = other.strategy
-        
         if random.random() < 0.05:
+            new_strategy = other.strategy
+        else:
             new_strategy = random.choice(STRATEGIES)
         
         return Player(new_strategy, self.index)
@@ -81,20 +88,29 @@ players = [Player(random.choice(STRATEGIES), i) for i in range(N)]
 
 # Hlavní smyčka hry
 scores = [[] for i in range(N)]
-for i in range(20):
-    print(f'Kolo: {i}')
+for i in range(K):
     # Hra každého hráče proti M soupeřům
     for j, player in enumerate(players):
-        print(f'   Hráč {j+1} proti:')
         opponents = random.sample(players[:j] + players[j+1:], M)
         player.play(opponents)
         scores[j].append(player.score)
     
-    # Evoluční krok
-    #players = evolve(players)
+    if X==1: 
+        # Evoluční krok
+        players = evolve(players)
+    
+    fig1 = make_subplots(rows=1, cols=1, subplot_titles=[f'Kolo {i+1}'])
+
+    for x, player_scores in enumerate(scores):
+        fig1.add_trace(go.Scatter(y=player_scores, name=f'Player {x+1}, str: {players[x].strategy}'), row=1, col=1)
+    
+    fig1.update_layout(title=f'Kolo {i+1} hry kámen-nůžky-papír - výsledky',
+                  xaxis_title='Kolo',
+                  yaxis_title='Skóre')
+    fig1.show()    
 
 # Vykreslení výsledků
-fig = make_subplots(rows=1, cols=N, subplot_titles=[f'Player {i+1} Strategie: {player.strategy}' for i, player in enumerate(players)])
+fig = make_subplots(rows=1, cols=N, subplot_titles=[f'{player.strategy}' for i, player in enumerate(players)])
 
 for i, player_scores in enumerate(scores):
     fig.add_trace(go.Scatter(y=player_scores, name=f'Player {i+1}'), row=1, col=i+1)
